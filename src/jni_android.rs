@@ -393,6 +393,27 @@ pub extern "system" fn Java_com_arkavault_secure_ArkaVaultNative_updatePassword(
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_arkavault_secure_ArkaVaultNative_deletePassword(
+    mut env: JNIEnv,
+    _class: JClass,
+    db_path: JString,
+    master_password: JString,
+    id: jlong,
+) -> jint {
+    let Some(path) = jstring_to_string(&mut env, &db_path) else {
+        return status_invalid_input();
+    };
+    let Some(master) = jstring_to_string(&mut env, &master_password) else {
+        return status_invalid_input();
+    };
+
+    guard_jint(|| match native_ffi::delete_credential(&path, &master, id) {
+        Ok(()) => status_ok(),
+        Err(err) => status_from_error(err),
+    })
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_arkavault_secure_ArkaVaultNative_generatePassword(
     mut env: JNIEnv,
     _class: JClass,

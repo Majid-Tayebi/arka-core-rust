@@ -306,6 +306,17 @@ pub fn update_password(
     })
 }
 
+/// Deletes a credential from the active vault after verifying `master_password`.
+pub fn delete_password(id: i64, master_password: String) -> Result<(), ArkaError> {
+    let master_password = Zeroizing::new(master_password);
+    require_non_empty(master_password.as_str(), "master_password")?;
+
+    with_active_db(|db| {
+        let _key = unlock_vault(master_password.as_str(), db)?;
+        db.delete_password_by_id(id)
+    })
+}
+
 /// Reads every entry from the active vault session and decrypts secrets with `master_password`.
 pub fn get_all_entries(
     db_path: String,
@@ -811,6 +822,33 @@ mod tests {
         assert_eq!(entries[0].password.as_str(), "new-secret");
         assert_eq!(entries[0].website_url, "gitlab.com");
         assert_eq!(entries[0].note, "updated");
+
+        remove_db(&path);
+        Ok(())
+    }
+
+    #[test]
+    fn delete_password_removes_row() -> Result<(), ArkaError> {
+        let _guard = VAULT_TEST_LOCK.lock().map_err(|_| ArkaError::LockPoisoned)?;
+        reset_session()?;
+        let path = temp_db_path("delete");
+        let path_str = path.to_string_lossy().into_owned();
+        let master = "delete-master-key";
+
+        init_database(path_str.clone())?;
+        let id = add_password(
+            "Temp".into(),
+            "bob".into(),
+            String::new(),
+            "secret".into(),
+            master.into(),
+            String::new(),
+            String::new(),
+        )?;
+        assert_eq!(get_all_entries(path_str.clone(), master.into())?.len(), 1);
+
+        delete_password(id, master.into())?;
+        assert_eq!(get_all_entries(path_str, master.into())?.len(), 0);
 
         remove_db(&path);
         Ok(())

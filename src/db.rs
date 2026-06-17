@@ -208,6 +208,19 @@ impl VaultDatabase {
         Ok(())
     }
 
+    /// Removes one credential row by primary key.
+    pub fn delete_password_by_id(&self, id: i64) -> Result<(), ArkaError> {
+        let deleted = self
+            .conn
+            .execute("DELETE FROM passwords WHERE id = ?1", params![id])?;
+        if deleted == 0 {
+            return Err(ArkaError::CorruptVault {
+                message: format!("password entry {id} not found"),
+            });
+        }
+        Ok(())
+    }
+
     /// Lists all entries in insertion order; blobs remain encrypted.
     pub fn list_passwords(&self) -> Result<Vec<PasswordRecord>, ArkaError> {
         let mut stmt = self.conn.prepare(

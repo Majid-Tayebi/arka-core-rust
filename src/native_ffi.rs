@@ -216,6 +216,15 @@ pub(crate) fn update_credential(
     )
 }
 
+pub(crate) fn delete_credential(
+    db_path: &str,
+    master_password: &str,
+    id: i64,
+) -> Result<(), ArkaError> {
+    vault::init_database(db_path.to_string())?;
+    vault::delete_password(id, master_password.to_string())
+}
+
 pub(crate) fn get_candidates_json(
     db_path: &str,
     master_password: &str,
