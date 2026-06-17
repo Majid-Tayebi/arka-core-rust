@@ -1,0 +1,12 @@
+# Strip debug symbols from Android native artifacts (Cargokit / FRB).
+[target.armv7-linux-androideabi]
+rustflags = ["-C", "strip=symbols"]
+
+[target.aarch64-linux-android]
+rustflags = ["-C", "strip=symbols"]
+
+[target.i686-linux-android]
+rustflags = ["-C", "strip=symbols"]
+
+[target.x86_64-linux-android]
+rustflags = ["-C", "strip=symbols"]
