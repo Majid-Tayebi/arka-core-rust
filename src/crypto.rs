@@ -66,7 +66,7 @@ impl KdfParams {
     /// Lower memory footprint for constrained mobile devices (OWASP minimum recommendation).
     pub const MOBILE: Self = Self {
         m_cost_kib: 19_456,
-        t_cost: 3,
+        t_cost: 2,
         p_cost: 1,
     };
 

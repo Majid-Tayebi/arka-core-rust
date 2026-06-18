@@ -171,6 +171,14 @@ pub fn init_database(db_path: String) -> Result<(), ArkaError> {
     Ok(())
 }
 
+/// Creates a new vault file and primes the in-memory session key in one Argon2 pass.
+pub fn bootstrap_vault(db_path: String, master_password: String) -> Result<(), ArkaError> {
+    let master_password = Zeroizing::new(master_password);
+    require_non_empty(master_password.as_str(), "master_password")?;
+    init_database(db_path)?;
+    with_vault_session(master_password.as_str(), |_| Ok(()))
+}
+
 /// Drops the in-memory vault session so derived keys and DB handles are released.
 ///
 /// Called when the user locks the app or auto-lock fires — ciphertext on disk stays
@@ -311,10 +319,7 @@ pub fn delete_password(id: i64, master_password: String) -> Result<(), ArkaError
     let master_password = Zeroizing::new(master_password);
     require_non_empty(master_password.as_str(), "master_password")?;
 
-    with_active_db(|db| {
-        let _key = unlock_vault(master_password.as_str(), db)?;
-        db.delete_password_by_id(id)
-    })
+    with_vault_session(master_password.as_str(), |session| session.db.delete_password_by_id(id))
 }
 
 /// Reads every entry from the active vault session and decrypts secrets with `master_password`.

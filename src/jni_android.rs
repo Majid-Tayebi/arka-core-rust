@@ -100,6 +100,25 @@ pub extern "system" fn Java_com_arkavault_secure_ArkaVaultNative_initVault(
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_arkavault_secure_ArkaVaultNative_bootstrapVault(
+    mut env: JNIEnv,
+    _class: JClass,
+    db_path: JString,
+    master_password: JString,
+) -> jint {
+    let Some(path) = jstring_to_string(&mut env, &db_path) else {
+        return status_invalid_input();
+    };
+    let Some(master) = jstring_to_string(&mut env, &master_password) else {
+        return status_invalid_input();
+    };
+    guard_jint(|| match native_ffi::bootstrap_vault(&path, &master) {
+        Ok(()) => status_ok(),
+        Err(err) => status_from_error(err),
+    })
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_arkavault_secure_ArkaVaultNative_lockVault(
     _env: JNIEnv,
     _class: JClass,

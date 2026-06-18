@@ -130,6 +130,10 @@ pub(crate) fn init_vault(db_path: &str) -> Result<(), ArkaError> {
     vault::init_database(db_path.to_string())
 }
 
+pub(crate) fn bootstrap_vault(db_path: &str, master_password: &str) -> Result<(), ArkaError> {
+    vault::bootstrap_vault(db_path.to_string(), master_password.to_string())
+}
+
 /// Releases the in-memory Rust vault session (keys + DB handle).
 pub(crate) fn lock_vault_session() -> Result<(), ArkaError> {
     vault::lock_vault()
