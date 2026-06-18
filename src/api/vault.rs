@@ -157,16 +157,29 @@ pub struct DecryptedPasswordEntry {
 }
 
 /// Opens (or creates) the vault at `db_path` and registers it as the active session.
+///
+/// Idempotent: if a session for the **same** `db_path` is already open, the existing
+/// session — including its cached Argon2id unlock key — is preserved. This keeps bulk
+/// operations (e.g. importing 100+ credentials) from re-deriving the key on every call,
+/// which previously made imports hang for minutes.
 pub fn init_database(db_path: String) -> Result<(), ArkaError> {
     require_non_empty(&db_path, "db_path")?;
 
+    let mut guard = session::vault_store()
+        .lock()
+        .map_err(|_| ArkaError::LockPoisoned)?;
+
+    if guard
+        .as_ref()
+        .is_some_and(|state| state.db_path() == db_path)
+    {
+        // Same vault already open — keep the cached unlock key alive.
+        return Ok(());
+    }
+
     let db = VaultDatabase::open(&db_path)?;
     db.ensure_kdf_salt()?;
-
-    session::vault_store()
-        .lock()
-        .map_err(|_| ArkaError::LockPoisoned)?
-        .replace(session::SessionState::new(db, db_path));
+    guard.replace(session::SessionState::new(db, db_path));
 
     Ok(())
 }
@@ -268,10 +281,9 @@ pub fn add_password(
     require_non_empty(&title, "title")?;
     require_non_empty(&password, "password")?;
 
-    with_active_db(|db| {
-        let key = unlock_vault(master_password.as_str(), db)?;
-        let encrypted = crypto::encrypt(&key, &password)?;
-        db.insert_password(
+    with_vault_session(master_password.as_str(), |session| {
+        let encrypted = crypto::encrypt(&session.key, &password)?;
+        session.db.insert_password(
             &title,
             &username,
             &category,
@@ -299,10 +311,9 @@ pub fn update_password(
     require_non_empty(&title, "title")?;
     require_non_empty(&password, "password")?;
 
-    with_active_db(|db| {
-        let key = unlock_vault(master_password.as_str(), db)?;
-        let encrypted = crypto::encrypt(&key, &password)?;
-        db.update_password(
+    with_vault_session(master_password.as_str(), |session| {
+        let encrypted = crypto::encrypt(&session.key, &password)?;
+        session.db.update_password(
             id,
             &title,
             &username,
@@ -510,17 +521,6 @@ fn with_vault_session<T>(
     };
 
     operation(&session)
-}
-
-fn with_active_db<T>(
-    operation: impl FnOnce(&VaultDatabase) -> Result<T, ArkaError>,
-) -> Result<T, ArkaError> {
-    let guard = session::vault_store()
-        .lock()
-        .map_err(|_| ArkaError::LockPoisoned)?;
-
-    let state = guard.as_ref().ok_or(ArkaError::VaultNotInitialized)?;
-    operation(state.db())
 }
 
 fn unlock_vault(master_password: &str, db: &VaultDatabase) -> Result<EncryptionKey, ArkaError> {
